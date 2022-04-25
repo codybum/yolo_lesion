@@ -128,6 +128,8 @@ def get_zip_image_name(zip_image_path):
 
 def build_dataset(args, zip_file_path):
 
+    cord_file_list = coords_df["File_name"].tolist()
+
 
     with ZipFile(zip_file_path, 'r') as zipObj:
         # Get a list of all archived file names from the zip
@@ -140,56 +142,57 @@ def build_dataset(args, zip_file_path):
 
                 image_name = get_zip_image_name(image_path)
 
-                ## find coords
-                name = coords_df.loc[coords_df['File_name'].str.contains(image_name, case=False)]
+                if image_name in cord_file_list:
+                    name = coords_df.loc[coords_df['File_name'].str.contains(image_name, case=False)]
 
-                if name.index.size > 0:
                     coords = coords_df["Bounding_boxes"][name.index[0]].split(',')
-                    label = coords_df["Coarse_lesion_type"][name.index[0]]
+                    #label = coords_df["Coarse_lesion_type"][name.index[0]]
+                    #everything is a lesion
+                    label = 1
                     train_val_test = coords_df["Train_Val_Test"][name.index[0]]
 
-                    if label != -1:  # -1 labels don't mean anything
-                        # Train
-                        if train_val_test == 1:
-                            train_image_path = os.path.join(args.dst_data_path,'images', 'train', image_path)
-                            save_file(zipObj, train_image_path, image_path)
+                    # Train
+                    if train_val_test == 1:
+                        train_image_path = os.path.join(args.dst_data_path, 'train', 'images', image_name)
+                        save_file(zipObj, train_image_path, image_path)
 
-                            train_label_path = os.path.join(args.dst_data_path,'labels', 'train', image_name[:-3] + "txt")
+                        train_label_path = os.path.join(args.dst_data_path, 'train', 'labels', image_name[:-3] + "txt")
 
-                            with open(train_label_path, 'a') as f:
-                                x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
-                                                     float(coords[3]),
-                                                     512, 512)
-                                f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
+                        with open(train_label_path, 'a') as f:
+                            x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
+                                                 float(coords[3]),
+                                                 512, 512)
+                            f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
 
-                            print('Training image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
+                        print('Training image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
 
-                        # Validation
-                        elif train_val_test == 2:
+                    # Validation
+                    elif train_val_test == 2:
 
-                            val_image_path = os.path.join(args.dst_data_path, 'images', 'val', image_name)
-                            save_file(zipObj, val_image_path, image_path)
+                        val_image_path = os.path.join(args.dst_data_path, 'val', 'images', image_name)
+                        save_file(zipObj, val_image_path, image_path)
 
-                            val_label_path = os.path.join(args.dst_data_path, 'labels', 'val', image_name[:-3] + "txt")
-                            with open(val_label_path, 'a') as f:
-                                x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
-                                                     float(coords[3]),
-                                                     512, 512)
-                                f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
-                            print('Val image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
+                        val_label_path = os.path.join(args.dst_data_path, 'val', 'labels', image_name[:-3] + "txt")
+                        with open(val_label_path, 'a') as f:
+                            x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
+                                                 float(coords[3]),
+                                                 512, 512)
+                            f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
+                        print('Val image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
 
-                        # Test
-                        elif train_val_test == 3:
+                    # Test
+                    elif train_val_test == 3:
 
-                            test_image_path = os.path.join(args.dst_data_path, 'images', 'test', image_name)
-                            save_file(zipObj, test_image_path, image_path)
-                            test_label_path = os.path.join(args.dst_data_path, 'labels', 'test', image_name[:-3] + "txt")
-                            with open(test_label_path, 'a') as f:
-                                x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
-                                                     float(coords[3]),
-                                                     512, 512)
-                                f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
-                            print('Test image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
+                        test_image_path = os.path.join(args.dst_data_path, 'test', 'images', image_name)
+                        save_file(zipObj, test_image_path, image_path)
+                        test_label_path = os.path.join(args.dst_data_path, 'test', 'labels', image_name[:-3] + "txt")
+                        with open(test_label_path, 'a') as f:
+                            x, y, w, h = convert(float(coords[0]), float(coords[1]), float(coords[2]),
+                                                 float(coords[3]),
+                                                 512, 512)
+                            f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
+                        print('Test image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
+
 
     zipObj.close()
 
@@ -251,7 +254,7 @@ if __name__ == '__main__':
 
     # general args
     parser.add_argument('--src_zip_path', type=str, default='src_zips', help='location of zip files')
-    parser.add_argument('--dst_data_path', type=str, default='data_set', help='location of extracted images')
+    parser.add_argument('--dst_data_path', type=str, default='lesion_data', help='location of extracted images')
 
 
     # get args
@@ -271,12 +274,12 @@ if __name__ == '__main__':
         shutil.rmtree(args.dst_data_path)
 
     # Create a new directory because it does not exist
-    os.makedirs(os.path.join(args.dst_data_path, 'images', 'train', ))
-    os.makedirs(os.path.join(args.dst_data_path, 'images', 'val', ))
-    os.makedirs(os.path.join(args.dst_data_path, 'images', 'test', ))
-    os.makedirs(os.path.join(args.dst_data_path, 'labels', 'train', ))
-    os.makedirs(os.path.join(args.dst_data_path, 'labels', 'val', ))
-    os.makedirs(os.path.join(args.dst_data_path, 'labels', 'test', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'train', 'images', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'val', 'images', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'test', 'images', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'train', 'labels', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'val', 'labels', ))
+    os.makedirs(os.path.join(args.dst_data_path, 'test', 'labels', ))
     print("New dataset director created")
 
 
