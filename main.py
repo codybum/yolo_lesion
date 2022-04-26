@@ -1,6 +1,7 @@
 import argparse
 import csv
 import hashlib
+import math
 import os
 import shutil
 from zipfile import ZipFile
@@ -12,7 +13,7 @@ from os.path import isfile, join
 import pandas as pd
 
 md5_checksums = dict()
-coords_df = pd.read_csv('DL_info.csv')
+coords_df = pd.read_csv('DL_info_min.csv')
 
 
 def get_md5():
@@ -95,13 +96,15 @@ def checkzips(args):
 # border box coord converter
 def convert(x1, y1, x2, y2, image_width, image_height):  # may need to normalize
 
+    scale = 1.25
+
     #scale from 512 -> 640
-    x1 = x1 * 1.2
-    y1 = y1 * 1.2
-    x2 = x2 * 1.2
-    y2 = y2 * 1.2
-    image_width = image_width * 1.2
-    image_height = image_height * 1.2
+    x1 = x1 * scale
+    y1 = y1 * scale
+    x2 = x2 * scale
+    y2 = y2 * scale
+    image_width = image_width * scale
+    image_height = image_height * scale
 
     dw = 1. / image_width
     dh = 1. / image_height
@@ -205,6 +208,43 @@ def convert_save_file(zipObj, file_path, zip_file_path):
     '''
     os.remove(tmp_file)
 
+def create_box_file(zipObj, zip_file_path, coords):
+
+    print(zip_file_path)
+    print(coords)
+    scale = 1.25
+    #x1 = math.floor(float(coords[0]) * 1.2)
+    #y1 = math.floor(float(coords[1]) * 1.2)
+    #x2 = math.ceil(float(coords[2]) * 1.2)
+    #y2 = math.ceil(float(coords[3]) * 1.2)
+
+    #scale = np.flipud(np.divide((640,640), (512,512)))
+    print(scale)
+
+    x1 = math.floor(float(coords[0]) * scale)
+    y1 = math.floor(float(coords[1]) * scale)
+    x2 = math.ceil(float(coords[2]) * scale)
+    y2 = math.ceil(float(coords[3]) * scale)
+
+    #print(x1,y1,x2,y2)
+
+
+    tmp_file = 'tmpfile.png'
+    original_file = open(tmp_file, "wb")
+    original_file.write(zipObj.read(zip_file_path))
+    original_file.close()
+
+    img_np = cv2.imread(tmp_file, -1)
+    img_np = (img_np.astype(np.int32) - 32768).astype(np.int16)
+    img_np = cv2.normalize(img_np, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    #img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)  # bgr to gray
+    img_np = np.array(Image.fromarray((img_np * 255).astype(np.uint8)).resize((640, 640)).convert('RGB'))
+    cv2.rectangle(img_np, (x1, y1), (x2, y2), (255, 0, 0), 0)
+    im = Image.fromarray(img_np)
+    im.save('test.png')
+
+    os.remove(tmp_file)
+    exit(0)
 
 def get_zip_image_name(zip_image_path):
     splt_path = zip_image_path.split("/")
@@ -261,6 +301,9 @@ def build_dataset(args, zip_file_path):
                     if train_val_test == 1:
                         train_image_path = os.path.join(args.dst_data_path, 'train', 'images', image_name)
                         # save_file(zipObj, train_image_path, image_path)
+
+                        #create_box_file(zipObj, image_path, coords)
+
                         convert_save_file(zipObj, train_image_path, image_path)
 
                         train_label_path = os.path.join(args.dst_data_path, 'train', 'labels', image_name[:-3] + "txt")
