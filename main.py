@@ -93,6 +93,26 @@ def convert(x1, y1, x2, y2, image_width, image_height):  # may need to normalize
     h = h * dh
     return x, y, w, h
 
+def get_coords(coords):
+
+    xmin = float(coords[0])
+    ymin = float(coords[1])
+    xmax = float(coords[2])
+    ymax = float(coords[3])
+
+    w_img = 512
+    h_img = 512
+
+    w = xmax - xmin
+    h = ymax - ymin
+
+    xcenter = (xmin + w / 2) / w_img
+    ycenter = (ymin + h / 2) / h_img
+    w = w / w_img
+    h = h / h_img
+
+    return xcenter, ycenter, w, h
+
 
 def read_DL_info():
     """read spacings and image indices in DeepLesion"""
@@ -146,6 +166,7 @@ def build_dataset(args, zip_file_path):
                     name = coords_df.loc[coords_df['File_name'].str.contains(image_name, case=False)]
 
                     coords = coords_df["Bounding_boxes"][name.index[0]].split(',')
+
                     #label = coords_df["Coarse_lesion_type"][name.index[0]]
                     #everything is a lesion
                     label = 1
@@ -264,9 +285,9 @@ if __name__ == '__main__':
     get_md5()
 
     # check that the dataset is valid
-    valid_zips = checkzips(args)
-    #valid_zips = []
-    #valid_zips.append('src_zips/Images_png_56.zip')
+    #valid_zips = checkzips(args)
+    valid_zips = []
+    valid_zips.append('src_zips/Images_png_56.zip')
 
     # make directories
 
