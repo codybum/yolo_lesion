@@ -14,6 +14,7 @@ import pandas as pd
 md5_checksums = dict()
 coords_df = pd.read_csv('DL_info.csv')
 
+
 def get_md5():
     with open("MD5_checksums.txt", 'r') as f:
         Lines = f.readlines()
@@ -74,10 +75,10 @@ def checkzips(args):
 
         for file in onlyfiles:
             file_path = os.path.join(args.src_zip_path, file)
-            #if not verify_md5(file_path):
+            # if not verify_md5(file_path):
             #    allMD5 = False
             #    print('Bad MD5: ' + file)
-            #else:
+            # else:
             checked_zips.append(file_path)
     else:
         print('Not all zips found')
@@ -93,6 +94,15 @@ def checkzips(args):
 
 # border box coord converter
 def convert(x1, y1, x2, y2, image_width, image_height):  # may need to normalize
+
+    #scale from 512 -> 640
+    x1 = x1 * 1.2
+    y1 = y1 * 1.2
+    x2 = x2 * 1.2
+    y2 = y2 * 1.2
+    image_width = image_width * 1.2
+    image_height = image_height * 1.2
+
     dw = 1. / image_width
     dh = 1. / image_height
     x = (x1 + x2) / 2.0
@@ -105,8 +115,8 @@ def convert(x1, y1, x2, y2, image_width, image_height):  # may need to normalize
     h = h * dh
     return x, y, w, h
 
-def get_coords(coords):
 
+def get_coords(coords):
     xmin = float(coords[0])
     ymin = float(coords[1])
     xmax = float(coords[2])
@@ -145,25 +155,40 @@ def read_DL_info():
     spacings = np.array(spacings)
     return idxs, spacings
 
-def save_file(zipObj, file_path, zip_file_path):
 
+def save_file(zipObj, file_path, zip_file_path):
     original_file = open(file_path, "wb")
     original_file.write(zipObj.read(zip_file_path))
     original_file.close()
 
+'''
+def load_slices(dir, slice_idxs):
+    """load slices from 16-bit png files"""
+    slice_idxs = np.array(slice_idxs)
+    assert np.all(slice_idxs[1:] - slice_idxs[:-1] == 1)
+    ims = []
+    for slice_idx in slice_idxs:
+        fn = '%03d.png' % slice_idx
+        path = os.path.join(SRC_IMAGE_PATH, dir, fn)
+        im = cv2.imread(path, -1)  # -1 is needed for 16-bit image
+        assert im is not None, 'error reading %s' % path
+        # print('read', path)
+
+        # the 16-bit png file has a intensity bias of 32768
+        ims.append((im.astype(np.int32) - 32768).astype(np.int16))
+    return ims
+'''
+
 def convert_save_file(zipObj, file_path, zip_file_path):
-
-
     tmp_file = 'tmpfile.png'
     original_file = open(tmp_file, "wb")
     original_file.write(zipObj.read(zip_file_path))
     original_file.close()
 
-    #img_np = np.frombuffer(zipObj.read(zip_file_path), dtype=np.int16)
-    #img_np = cv2.imdecode(img_np, cv2.IMREAD_GRAYSCALE)  # cv2.IMREAD_COLOR in OpenCV 3.1
     img_np = cv2.imread(tmp_file, -1)
-    img_np = np.uint8(cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX))
+    img_np = cv2.normalize(img_np, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)  # bgr to gray
+    img_np = np.array(Image.fromarray((img_np * 255).astype(np.uint8)).resize((640, 640)).convert('RGB'))
     im = Image.fromarray(img_np)
     im.save(file_path)
 
@@ -178,17 +203,15 @@ def convert_save_file(zipObj, file_path, zip_file_path):
     im = Image.fromarray(img_np)
     im.save(file_path)
     '''
-
     os.remove(tmp_file)
 
-def get_zip_image_name(zip_image_path):
 
+def get_zip_image_name(zip_image_path):
     splt_path = zip_image_path.split("/")
     image_name = splt_path[1] + '_' + splt_path[2]
     return image_name
 
 def build_dataset(args, zip_file_path):
-
     cord_file_list = coords_df["File_name"].tolist()
 
     with ZipFile(zip_file_path, 'r') as zipObj:
@@ -196,6 +219,7 @@ def build_dataset(args, zip_file_path):
         print('Opening Zip: ' + zip_file_path)
         listOfFileNames = zipObj.namelist()
         # Iterate over the file names
+
         for image_path in listOfFileNames:
             # Check filename endswith csv
             if image_path.endswith('.png'):
@@ -206,10 +230,10 @@ def build_dataset(args, zip_file_path):
                     name = coords_df.loc[coords_df['File_name'].str.contains(image_name, case=False)]
 
                     coords = coords_df["Bounding_boxes"][name.index[0]].split(',')
-                    #ncoords = coords_df["Normalized_lesion_location"][name.index[0]].split(',')
+                    # ncoords = coords_df["Normalized_lesion_location"][name.index[0]].split(',')
 
-                    #label = coords_df["Coarse_lesion_type"][name.index[0]]
-                    #everything is a lesion
+                    # label = coords_df["Coarse_lesion_type"][name.index[0]]
+                    # everything is a lesion
                     label = 1
                     train_val_test = coords_df["Train_Val_Test"][name.index[0]]
                     '''
@@ -236,9 +260,8 @@ def build_dataset(args, zip_file_path):
                     # Train
                     if train_val_test == 1:
                         train_image_path = os.path.join(args.dst_data_path, 'train', 'images', image_name)
-                        #save_file(zipObj, train_image_path, image_path)
+                        # save_file(zipObj, train_image_path, image_path)
                         convert_save_file(zipObj, train_image_path, image_path)
-
 
                         train_label_path = os.path.join(args.dst_data_path, 'train', 'labels', image_name[:-3] + "txt")
 
@@ -254,7 +277,7 @@ def build_dataset(args, zip_file_path):
                     elif train_val_test == 2:
 
                         val_image_path = os.path.join(args.dst_data_path, 'val', 'images', image_name)
-                        #save_file(zipObj, val_image_path, image_path)
+                        # save_file(zipObj, val_image_path, image_path)
                         convert_save_file(zipObj, val_image_path, image_path)
 
                         val_label_path = os.path.join(args.dst_data_path, 'val', 'labels', image_name[:-3] + "txt")
@@ -269,7 +292,7 @@ def build_dataset(args, zip_file_path):
                     elif train_val_test == 3:
 
                         test_image_path = os.path.join(args.dst_data_path, 'test', 'images', image_name)
-                        #ave_file(zipObj, test_image_path, image_path)
+                        # ave_file(zipObj, test_image_path, image_path)
                         convert_save_file(zipObj, test_image_path, image_path)
 
                         test_label_path = os.path.join(args.dst_data_path, 'test', 'labels', image_name[:-3] + "txt")
@@ -280,9 +303,7 @@ def build_dataset(args, zip_file_path):
                             f.write(str(label - 1) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
                         print('Test image: ' + image_name + ' from: ' + zip_file_path + ' ' + str(train_val_test))
 
-
     zipObj.close()
-
 
 def process_zip():
     # Create a ZipFile Object and load sample.zip in it
@@ -295,16 +316,13 @@ def process_zip():
             if fileName.endswith('.png'):
                 tmp_file = 'original.png'
                 # CV2
-                #original_file = open(tmp_file, "wb")
-                #zipObj.read(fileName)
-                #original_file.write(zipObj.read(fileName))
-                #original_file.close()
+                # original_file = open(tmp_file, "wb")
+                # zipObj.read(fileName)
+                # original_file.write(zipObj.read(fileName))
+                # original_file.close()
 
-                #img_np = cv2.imread(tmp_file, -1)
-                #img_np = cv2.imread(zipObj.read(fileName))
-
-
-
+                # img_np = cv2.imread(tmp_file, -1)
+                # img_np = cv2.imread(zipObj.read(fileName))
 
                 print(fileName)
                 convert_save_file(zipObj, 'test.png', fileName)
@@ -322,17 +340,17 @@ def process_zip():
                 im.save("filename_0.png")
                 '''
 
-                #img_np = cv2.imread(tmp_file, -1)
-                #print(type(img_np))
+                # img_np = cv2.imread(tmp_file, -1)
+                # print(type(img_np))
 
-                #nparr = np.frombuffer(zipObj.read(fileName), dtype=np.int16)
+                # nparr = np.frombuffer(zipObj.read(fileName), dtype=np.int16)
                 # img_np = cv2.imread(nparr, -1)
 
                 # print(type(nparr))
-                #img_np = cv2.imdecode(nparr, cv2.IMREAD_ANYCOLOR)  # cv2.IMREAD_COLOR in OpenCV 3.1
+                # img_np = cv2.imdecode(nparr, cv2.IMREAD_ANYCOLOR)  # cv2.IMREAD_COLOR in OpenCV 3.1
                 # print(type(img_np))
 
-                #img_np = cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX)
+                # img_np = cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX)
                 # img_np = np.uint8(cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX))
 
                 # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
@@ -340,16 +358,16 @@ def process_zip():
 
                 # img_np = cv2.equalizeHist(img_np)
 
-                #img_np = (img_np.astype(np.int32) - 32768).astype(np.int16)
+                # img_np = (img_np.astype(np.int32) - 32768).astype(np.int16)
 
-                #im = Image.fromarray(img_np)
+                # im = Image.fromarray(img_np)
 
                 # imgGray = im.convert('L')
                 # imgGray.save('test_gray.jpg')
 
-                #im.save("filename_0.png")
+                # im.save("filename_0.png")
 
-                #im.save("filename_1.jpeg")
+                # im.save("filename_1.jpeg")
 
                 # print(type(zipObj.read(fileName)))
                 # print(fileName)
@@ -395,8 +413,5 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(args.dst_data_path, 'test', 'labels', ))
     print("New dataset director created")
 
-
     for valid_zip in valid_zips:
         build_dataset(args, valid_zip)
-
-
