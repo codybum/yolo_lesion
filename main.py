@@ -23,9 +23,18 @@ def get_md5():
             file = row_s[1]
             md5_checksums[file] = check
 
-def convert_I_to_L(img):
-    array = np.uint8(np.array(img) / 256)
-    return Image.fromarray(array)
+
+def convert_to_png(ims):
+    """save 2D slices to 3D nifti file considering the spacing"""
+    if len(ims) < 300:  # cv2.merge does not support too many channels
+        V = cv2.merge(ims)
+    else:
+        V = np.empty((ims[0].shape[0], ims[0].shape[1], len(ims)))
+        for i in range(len(ims)):
+            V[:, :, i] = ims[i]
+
+    return V
+
 
 def verify_md5(file_path):
     filename = os.path.basename(file_path)
@@ -144,18 +153,31 @@ def save_file(zipObj, file_path, zip_file_path):
 
 def convert_save_file(zipObj, file_path, zip_file_path):
 
-    tmp_file = 'tmpfile.png'
 
+    tmp_file = 'tmpfile.png'
+    original_file = open(tmp_file, "wb")
+    original_file.write(zipObj.read(zip_file_path))
+    original_file.close()
+
+    #img_np = np.frombuffer(zipObj.read(zip_file_path), dtype=np.int16)
+    #img_np = cv2.imdecode(img_np, cv2.IMREAD_GRAYSCALE)  # cv2.IMREAD_COLOR in OpenCV 3.1
+    img_np = cv2.imread(tmp_file, -1)
+    img_np = np.uint8(cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX))
+    img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)  # bgr to gray
+    im = Image.fromarray(img_np)
+    im.save(file_path)
+
+    '''
+    tmp_file = 'tmpfile.png'
     original_file = open(tmp_file, "wb")
     original_file.write(zipObj.read(zip_file_path))
     original_file.close()
 
     img_np = cv2.imread(tmp_file, -1)
-    #img_np = cv2.imdecode(nparr, cv2.IMREAD_ANYCOLOR)  # cv2.IMREAD_COLOR in OpenCV 3.1
     img_np = np.uint8(cv2.normalize(img_np, None, 0, 255, cv2.NORM_MINMAX))
     im = Image.fromarray(img_np)
-    #im = convert_I_to_L(im)
     im.save(file_path)
+    '''
 
     os.remove(tmp_file)
 
@@ -247,7 +269,7 @@ def build_dataset(args, zip_file_path):
                     elif train_val_test == 3:
 
                         test_image_path = os.path.join(args.dst_data_path, 'test', 'images', image_name)
-                        #save_file(zipObj, test_image_path, image_path)
+                        #ave_file(zipObj, test_image_path, image_path)
                         convert_save_file(zipObj, test_image_path, image_path)
 
                         test_label_path = os.path.join(args.dst_data_path, 'test', 'labels', image_name[:-3] + "txt")
